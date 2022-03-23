@@ -1,0 +1,75 @@
+JDBC课堂笔记
+
+1、什么是JDBC？
+	Java DataBase Connectivity
+	在java语言中编写sql语句，对mysql数据库中的数据进行CRUD操作。
+
+2、JDBC相关的类库在哪里？
+	java.sql.*;
+
+3、JDBC本质上是一堆什么呢？
+	java.sql.*;
+	这个包下都是JDBC的接口，SUN公司制定的！
+	JDBC是体现“接口作用”的非常经典的例子。
+	JDBC降低了耦合度，提高了扩展力。
+	对于java程序员来说，不需要关心数据库是哪个品牌。只要面向JDBC接口编程就行！
+
+	JDBC整个程序的结构当中有三波人？？？？
+
+		第一波：SUN公司，负责制定JDBC接口。这些接口已经写好了，在java.sql.*;
+
+		第二波：java.sql.*下面的所有接口都要有实现类，这些实现类是数据库厂家编写的。
+					我们连接的是mysql数据库，mysql数据库厂家的实现类在哪里呢？
+						mysql-connector-java-5.1.23-bin.jar
+						jar包中很多.class字节码文件，这是mysql数据库厂家写的接口实现！
+
+						注意：如果连接的是oracle数据库，你需要从网上下载oracle的jar包。
+
+						mysql-connector-java-5.1.23-bin.jar 这个jar包有一个专业的术语，
+						大家记住就行：mysql的驱动。
+
+						如果是oracle的jar，被称为oracle的驱动。
+		
+		第三波：我们java程序员，面向JDBC接口写代码就行！
+
+
+4、JDBC开发之前的准备工作？
+	mysql的驱动jar包，需要配置到classpath当中吗？
+		mysql-connector-java-5.1.23-bin.jar里是字节码，是class文件。
+		Java虚拟机的类加载器会去加载class文件，类加载器怎么能够
+		找到这些class文件呢？
+			classpath没有配置的情况下，默认从当前路径下加载class。
+			classpath如果配置死了，例如：classpath=D:\abc，则表示固定只从d:\abc目录下找class
+
+			classpath=.;D:\course\04-JDBC\resources\MySql Connector Java 5.1.23\mysql-connector-java-5.1.23-bin.jar
+
+			. 代表什么？当前路径。
+			以上的classpath什么意思？
+				类加载器从当前路径下加载class，如果当前路径下没找到，
+				则去D:\course\04-JDBC\resources\MySql Connector Java 5.1.23\mysql-connector-java-5.1.23-bin.jar
+				找class文件。
+
+		jar包需要解压吗？
+			不需要解压，java虚拟机的类加载器有这个能力找到class文件。
+
+5、JDBC编程六步
+
+6、注册驱动的第二种方式
+
+7、连接数据库的信息统一写到属性配置文件中。
+
+8、实现一个登录功能。
+
+	第一步：提供一个输入的界面，可以让用户输入用户名和密码。
+
+	第二步：底层数据库当中需要有一张用户表，用户表中存储了用户信息。
+
+	第三步：当java程序接收到用户名和密码的时候，连接数据库验证用户名和密码。
+	验证通过，表示登录成功，验证失败，表示登录失败。
+
+9、Statement主要是进行sql语句的拼接。PreparedStatement可以避免sql注入，主要进行传值。
+
+10、JDBC的事务问题？
+	conn.setAutoCommit(false);
+	conn.commit();
+	conn.rollback();

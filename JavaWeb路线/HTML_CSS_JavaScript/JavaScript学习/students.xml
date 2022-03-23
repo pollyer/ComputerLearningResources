@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="gbk"?>
+<students>
+	<student>
+		<name>zhangsan</name>
+		<age>20</age>
+	</student>
+	<student>
+		<name>lisi</name>
+		<age>21</age>
+	</student>
+	<student>
+		<name>wangwu</name>
+		<age>22</age>
+	</student>
+</students>
