@@ -252,6 +252,8 @@ $\Rarr$多环境配置
     profiles:
       active: 环境名称
   ```
+  
+  > 不指定激活的话，就只有application.yml一个配置文件起作用
 
 #### (六) SpringBoot自定义配置
 

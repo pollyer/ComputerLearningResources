@@ -1824,6 +1824,15 @@ const vm = new Vue({
     - build：**编译** Vue 项目
     - lint：全盘语法检查（没啥用）
 
+    ```json
+    "scripts": {
+      "dev": "vue-cli-service serve",  //n
+      "build:prod": "vue-cli-service build",
+      "build:stage": "vue-cli-service build --mode staging",
+      "lint": "eslint --ext .js,.vue src"
+    },
+    ```
+
 - package-lock.json
 
   - 包版本控制文件
@@ -2229,7 +2238,7 @@ const vm = new Vue({
     <组件 v-on:原生事件.native="回调函数"/>
     ```
 
-    > 原生事件回调函数中的`this`就是组件中那个**唯一的根元素**
+    > 原生事件回调函数中的`this`就是组件中那个**唯一的根元素**，因为有native，已经变成最原始的HTML标签了，与vue无关
 
 - *触发自定义事件*
 
@@ -2744,7 +2753,7 @@ module.exports = {
 
   > 相当于在actions对象中添加**切面功能**，
   >
-  > 而且通过上下文对象的`dispatch`方法继承调用其他的actions
+  > 而且通过上下文对象的`dispatch`方法继续调用其他的actions
 
 - 在<u>***mutation***对象</u>中添加**函数**，进行相关操作
 
@@ -2835,13 +2844,13 @@ module.exports = {
   > ...mapState('命名空间', ['state中的数据名', 'xxx'])
   > ```
   >
-  > > 在组件中使用命名空间时，要求对象中开启这个**命名空间**，即`namespaced`属性指定为`true`
+  > > 在组件中使用命名空间时，要求对象中开启这个**命名空间**，即`namespaced`属性指定为`true`；如果不开启命名空间，就是全局的，使用时不用带着命名空间前缀
   >
   > > 有**多个命名空间时**，`mapState`也可以写多个
   >
   > 这样在组件中使用的时候就不用带着`vc.$store.state.对象名`了
   >
-  > > 注：如果只在`mapState`中引入命名空间，则使用时需要`命名空间.数据`
+  > > 注：如果只在`mapState`中引入命名空间，而不指定数据，则使用时需要`命名空间.数据`
   >
   > 其他3个`mapXxx`的使用也同理
 
