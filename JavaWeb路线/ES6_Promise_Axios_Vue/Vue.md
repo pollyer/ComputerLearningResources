@@ -437,7 +437,7 @@ const vm = new Vue({
 - 指定`options`的`computed`属性，`computed`的属性值也应是对象
 - 这个<u>对象内部的属性名</u>就是**计算属性名**，属性值又是一个对象，其中有<u>`getter`和`setter`</u>
 
-```js
+```html
 <body>
 <div id="root">
     family name: <input type="text" v-model="familyName"><br>
@@ -2244,6 +2244,8 @@ const vm = new Vue({
 
   - 给哪个**组件绑定**的，就让哪个组件触发
 
+    > 比如可以在组件.vue中用一个按钮，在这个按钮的回调中触发自定义事件
+
   - 在组件内部：`this.$emit('自定义事件', 参数1, 参数2, ...)`
 
     > 这个参数不要在组件标签中写，
@@ -2999,7 +3001,7 @@ module.exports = {
 >
 > - 每个组件都有自己的<u>```$route```属性</u>，里面存储着自己的**路由信息**
 >
->   > 整个应用只有一个 ***router***，可以通过组件的<u>```$router```属性</u>获取到。
+>   > 整个应用只有一个 ***router***，可以通过组件的<u>```$route```属性</u>获取到。
 
 #### (二) 嵌套路由
 

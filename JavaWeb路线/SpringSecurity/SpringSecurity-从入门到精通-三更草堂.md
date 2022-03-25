@@ -1241,6 +1241,8 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
 > > 注意，这只是个位置，因为不调用父类方法时，
 > >
 > > `UsernamePasswordAuthenticationFilter`默认不存在
+>
+> 注意，就算是“放行”了某些接口，这个过滤器还是会走的
 
 > 还要注意是一个问题，当出现*token*非法的异常时，需要重新设置`response body`，
 >
@@ -1255,6 +1257,16 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
 >                                            Object credentials,
 > 			Collection<? extends GrantedAuthority> authorities) {...}
 > ```
+
+> 关于SecurityContextHolder：
+>
+> > SecurityContextHolder本身是在同一个请求域生效的
+>
+> 在`JwtAuthenticationTokenFilter`前，还有一个`SecurityContextPersistenceFilter`，会尝试从session中获取securityContext，并在每次请求处理结束后存储securityContext到session中。
+>
+> > 但是，如果SpringSecurity禁用了session，就不能这样了。
+> >
+> > > 当然，禁用的只是SpringSecurity的session，其他程序的session使用还是有的，一般由SpringSession去管理
 
 ~~~~java
 /**
