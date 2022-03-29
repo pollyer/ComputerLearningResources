@@ -2122,9 +2122,9 @@
    > ```java
    > @Override
    > public void run() {
-   > if (target != null) {
-   >   target.run();
-   > }
+   >   if (target != null) {
+   >       target.run();
+   >   }
    > }
    > ```
 
@@ -2182,7 +2182,6 @@
 >
 > 这种方式实现的线程，可以**获取线程的返回值**
 >
-> 但<u>效率较低</u>
 
 1. `new`一个`FutureTask`对象，构造方法中传入`Callable`接口实现类对象
 
@@ -2195,11 +2194,11 @@
    > ```java
    > @FunctionalInterface
    > public interface Callable<V> {
-   >  V call() throws Exception;
+   >    V call() throws Exception;
    > }
    > ```
    >
-   > `call()`方法的地位相当于`run()`方法，但它**有返回值**
+   > `call()`方法的地位相当于`run()`方法，但它**==有返回值==**
 
    > 如果还传入`Runnable`类型的参数，就还是**没有返回值**
 
@@ -2209,13 +2208,15 @@
    public Thread(Runnable target) {...}
    ```
 
+   > 然后还是可以通过`Thread`对象的`start()`方法运行线程
+
 3. 通过`FutureTask`对象的`get()`方法获取**线程返回值**
 
    ```java
    public V get() throws InterruptedException, ExecutionException {...}
    ```
 
-   > 这个`get()`方法会导致**当前线程**阻塞，直到任务对应的线程对象的`call()`方法执行**结束**得到返回值
+   > 这个`get()`方法会导致**当前线程**阻塞（<u>WAITING，内部有LockSupport.park</u>），直到任务对应的线程对象的`call()`方法执行**结束**得到返回值
    >
    > 这就是这个方法<u>效率低</u>的地方，会<u>使当前线程受阻</u>
 
@@ -2225,7 +2226,7 @@
 
 ---
 
-<img src="C:/Users/不怕晒的铃铛/Desktop/学习资料（真的）/JavaWeb路线/前后端分离基础项目/SGBlog/笔记/pics/线程生命周期.png" style="zoom:80%;" />
+<img src="pics/线程生命周期.png" style="zoom:80%;" />
 
 > 线程在**就绪状态**和**运行状态**之间频繁转换
 
@@ -2517,7 +2518,7 @@
 
     > **共享对象**是**<u>需要排队的线程</u>**的共享的对象，<u>不需要排队的线程</u>最好不要遇到同一个共享对象
     >
-    > （同步代码块的共享数据必须是一个**对象引用**）
+    > （同步代码块的共享数据必须是一个**对象==引用==**）
     >
     > > :star:什么类型的对象可以成为共享对象？根本条件是——**只有一个**
     > >
@@ -2543,16 +2544,16 @@
     >
     > ```java
     > public void withdraw(double money) {
-    >  synchronized (this) {
-    >      double before = getBalance();
-    >      double after = before - money;
-    >      try {
+    >    synchronized (this) {
+    >        double before = getBalance();
+    >        double after = before - money;
+    >        try {
     >          Thread.sleep(1000);
-    >      } catch (InterruptedException e) {
+    >        } catch (InterruptedException e) {
     >          e.printStackTrace();
-    >      }
-    >      setBalance(after);
-    >  }
+    >        }
+    >        setBalance(after);
+    >    }
     > }
     > ```
 
@@ -2721,7 +2722,7 @@
 
   > 不过，这种方式在目前的开发中也很少用，因为现在有很多**高级框架**都是**支持定时任务**的，当然框架的低层也是`Timer`
 
-- ##### *方式三：`SprintTask`框架*
+- ##### *方式三：`SpringTask`框架*
 
   - 这是目前实际开发中，<u>使用较多</u>的方式 
   - 这个框架只要进行简单的<u>配置</u>，就可以完成定时器的任务
@@ -2775,13 +2776,13 @@
    > SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
    > Date firstTime = sdf.parse("2020-03-14 09:34:30");
    > timer.schedule(new TimerTask(){
-   >  @Override
-   >  public void run() {
-   > 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"
-   > 		String strTime = sdf.format(new Date());
-   > 		System.out.println(strTime + ":成功完成了一次数据备份！");
-   >  }
-   > } , firstTime, 1000 * 10);
+   >    @Override
+   >    public void run() {
+   >     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"
+   >                                                 String strTime = sdf.format(new Date());
+   >                                                 System.out.println(strTime + ":成功完成了一次数据备份！");
+   >                                                  }
+   >                                                 } , firstTime, 1000 * 10);
    > ```
 
 ---
@@ -2794,7 +2795,7 @@
 
 - ##### *概述*
 
-  - `wait`与`notify`方法<u>不是线程对象的专属方法</u>，而是所有`java`对象都有的方法，是==`Object`类中的方法==
+  - `wait`与`notify`方法<u>不是线程对象的专属方法</u>，而是所有`java`对象都有的方法，是==Object类中的方法==
 
 - ##### *作用*
 
@@ -3414,6 +3415,8 @@
   > 调用方法四要素：
   >
   > 对象、方法名、实际参数、返回值
+  >
+  > > 如果要调用的是静态方法，`obj`参数可以直接传`null`（传非`null`也没啥用）
 
 #### （三）Method类应用
 
