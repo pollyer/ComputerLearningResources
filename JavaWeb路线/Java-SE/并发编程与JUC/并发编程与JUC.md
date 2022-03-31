@@ -404,6 +404,480 @@ IO 操作不占用 cpu，只是我们一般拷贝文件使用的是【阻塞 IO�
 
 ## 4. 共享模型之管程
 
+---
+
+### 4.1 共享问题
+
+#### 4.4.1 问题引入
+
+```java
+static int counter = 0;
+ 
+public static void main(String[] args) throws InterruptedException {
+    Thread t1 = new Thread(() -> {
+        for (int i = 0; i < 5000; i++) {
+            counter++;
+        }
+    }, "t1");
+ 
+    Thread t2 = new Thread(() -> {
+        for (int i = 0; i < 5000; i++) {
+            counter--;
+        }
+    }, "t2");
+ 
+    t1.start();
+    t2.start();
+    t1.join();
+    t2.join();
+    log.debug("{}",counter);
+}
+```
+
+#### 4.4.2 问题分析
+
+需要从**字节码**的角度来分析：
+
+以上的结果可能是正数、负数、零。为什么呢？
+因为 Java 中对静态变量的自增，自减并不是原子操作，要彻底理解，必须从字节码来进行分析
+
+例如对于 i++ 而言（i 为静态变量），实际会产生如下的 JVM 字节码指令：
+
+ ```java
+ getstatic     i  // 获取静态变量i的值
+ iconst_1         // 准备常量1
+ iadd             // 自增
+ putstatic     i  // 将修改后的值存入静态变量i
+ ```
+
+而对应 i-- 也是类似：
+
+ ```java
+ getstatic     i  // 获取静态变量i的值
+ iconst_1         // 准备常量1
+ isub             // 自减
+ putstatic     i  // 将修改后的值存入静态变量i
+ ```
+
+而 Java 的内存模型如下，完成静态变量的自增、自减需要在主存和工作内存中进行数据交换：
+
+（以出现负数的情况为例）
+
+<img src="pics/image-20220331153854797.png" alt="image-20220331153854797" style="zoom:67%;" />
+
+#### 4.4.3 临界区
+
+> ***Critical Section***
+
+- 根源：多线程并发环境下，对共享数据进行修改
+
+  > 底层的指令出现混乱**交错**
+
+- 一段代码块内如果存在对==共享资源==的**多线程**<u>读写</u>操作， 这段代码块就称之为**临界区**
+
+  > 例子中的`counter++`和`couter--`各自就是一个临界区，`for`不算
+
+#### 4.4.4 竞态条件
+
+> ***Race Condition***
+
+多个线程在**临界区**内执行，由于代码的<u>执行序列不同</u>而导致结果无法预测，称之为发生了**竞态条件**
+
+> ==**线程上下文切换**时，会出现**指令交错**现象==
+
+---
+
+### 4.2 synchronized
+
+> 为了避免临界区的竞态条件发生，有多种手段可以达到目的。
+>
+> - 阻塞式的解决方案：`synchronized`，`Lock`
+> - 非阻塞式的解决方案：**原子变量**
+
+synchronized，即俗称的【**对象锁**】，它采用==互斥==的方式让同一时刻至多只有一个线程能持有【对象锁】，其它线程再想获取这个【对象锁】时就会**阻塞**住。
+
+这样就能保证拥有锁的线程可以安全的执行临界区内的代码，不用担心<u>线程上下文切换</u>。
+
+> :star:关于**互斥**和**同步**的区分：
+> 虽然 java 中**互斥**和**同步**都可以采用`synchronized`关键字来完成，但它们还是有区别的：
+>
+> - 互斥是保证同一时刻<u>只能有一个线程执行**临界区**代码</u>
+>
+>   > 也就是避免**静态条件**
+>
+> - 同步是由于线程执行的先后**顺序**不同，需要一个线程<u>等待其它线程运行到某个点</u>
+
+建议将**锁对象**和**资源**绑定，而不是把`synchronized`写在线程的run里面，这样更符合**面向对象**思想
+
+<img src="pics/image-20220331155554200.png" alt="image-20220331155554200" style="zoom:67%;" />
+
+>`synchronized`实际是用**对象锁**保证了<u>临界区内代码的**原子性**</u>，临界区内的代码对外是不可分割的，不会被线程切换所打断。
+
+---
+
+### 4.3 线程安全分析
+
+#### 4.3.1 成员变量和静态变量
+
+- 如果它们**没有共享**，则线程安全
+- 如果它们被**共享**了，根据它们的状态是否能够改变，又分两种情况
+  - 如果只有**读**操作，则线程安全
+  - 如果有读**写**操作，则这段代码是**临界区**，需要考虑**线程安全**
+
+#### 4.3.2 局部变量
+
+- 局部变量<u>本身的值</u>是线程安全的
+
+  > 举例：局部变量`int i`
+  >
+  > <img src="pics/image-20220331161206514.png" alt="image-20220331161206514" style="zoom:50%;" />
+
+- 但局部变量**引用的对象**则未必
+
+  - 如果该对象没有逃离<u>方法的作用范围</u>，它是线程安全的
+  - 如果该对象逃离<u>方法的作用范围</u>，需要考虑线程安全
+
+> 举例：
+>
+> ```java
+> class ThreadSafe {
+>     public void method1(int loopNumber) {
+>         ArrayList<String> list = new ArrayList<>();
+>         for (int i = 0; i < loopNumber; i++) {
+>             method2(list);
+>             method3(list);
+>         }
+>     }
+> 
+>     public void method2(ArrayList<String> list) {
+>         list.add("1");
+>     }
+> 
+>     public void method3(ArrayList<String> list) {
+>         list.remove(0);
+>     }
+> }
+> 
+> class ThreadSafeSubClass extends ThreadSafe{
+>     @Override
+>     public void method3(ArrayList<String> list) {
+>         new Thread(() -> {
+>             list.remove(0);
+>         }).start();
+>     }
+> }
+> 
+> class Test {
+>     static final int THREAD_NUMBER = 1;
+>     static final int LOOP_NUMBER = 200;
+>     public static void main(String[] args) {
+>         ThreadSafe test = new ThreadSafeSubClass();
+>         for (int i = 0; i < THREAD_NUMBER; i++) {
+>             new Thread(() -> {
+>                 test.method1(LOOP_NUMBER);
+>             }, "Thread" + i).start();
+>         }
+>     }
+> }
+> ```
+>
+> 引发问题的本质：<u>在方法内部创建一个**新的线程**，持有**局部变量引用**</u>，
+> ==**局部变量**被暴露给了其他**线程**==
+>
+> > 怎么出的问题？
+> >
+> > `add`中有`size++`，`remove`中有`--size`，自增和自减指令都不是原子性的，可以继续拆分（上文中有分析字节码），在另一个线程remove时，可能已经进入下一次循环的add了，这时`--size`获取值的时候`size++`还没执行完，而`--size`在设置值的时候`size++`已经执行完了，这就导致最终`size`的值被`remove`方法错误地设置了，下次再`remove`的时候就会出错
+>
+> > 这里也说明了方法私有化的好处：只要把`ThreadSafe`的`method3`改成`private`，其他不用动，就不会再出现问题了（也可以再使用一个`final`，更安全）
+> >
+> > > 把父类的`method3`私有化之后，这样直接使用子类引用会不会引发问题？
+> > >
+> > > ```java
+> > > ThreadSafeSubClass test = new ThreadSafeSubClass();
+> > > for (int i = 0; i < THREAD_NUMBER; i++) {
+> > >   new Thread(() -> {
+> > >     test.method1(LOOP_NUMBER);
+> > >   }, "Thread" + i).start();
+> > > }
+> > > ```
+> > >
+> > > 难道这样就会去调用子类的`method3`了吗？别忘了，在父类的`method1`中，对`method3(list)`的调用虽然是`this.method3(list)`，但这个方法地址已经被静态到父类的`method3`中了，而子类又没能对其进行覆盖，所以调的还是这个方法
+
+#### 4.3.3 常见线程安全类
+
+- String
+- StringBuﬀer
+- Integer等包装类
+- Random
+- Vector
+- Hashtable
+- ***java.util.concurrent***包下的类
+
+这里说它们是线程安全的是指，多个线程调用它们同一个实例的某个方法时，是线程安全的。
+
+- 它们的**每个方法**是==原子==的
+- 但注意它们**多个方法的组合**不是原子的，见后面分析
+
+==将线程安全类的方法进行**组合**==，就可能导致不安全，例如：
+
+```java
+Hashtable table = new Hashtable();
+// 线程1，线程2
+if( table.get("key") == null) {
+    table.put("key", value);
+}
+```
+
+<img src="pics/image-20220331172628398.png" alt="image-20220331172628398" style="zoom:67%;" />
+
+*关于不可变类线程安全性：*
+
+String、Integer 等都是不可变类，因为其内部的状态不可以改变，因此它们的方法都是线程安全的
+
+> 线程安全问题举例：
+>
+> ```java
+> @Aspect
+> @Component
+> public class MyAspect {
+>     // 是否安全？不安全
+>   	// 怎么解决？可以使用环绕通过，将start设置成局部变量
+>     private long start = 0L;
+>     
+>     @Before("execution(* *(..))")
+>     public void before() {
+>         start = System.nanoTime();
+>     }
+>     
+>     @After("execution(* *(..))")
+>     public void after() {
+>         long end = System.nanoTime();
+>         System.out.println("cost time:" + (end-start));
+>     }
+> }
+> ```
+>
+> ```java
+> public class MyServlet extends HttpServlet {
+>     // 是否安全？是。因为没修改
+>     private UserService userService = new UserServiceImpl();
+>     
+>     public void doGet(HttpServletRequest request, HttpServletResponse response) {
+>         userService.update(...);
+>     }
+> }
+>  
+> public class UserServiceImpl implements UserService {
+>     // 是否安全？是。虽然这是个成员变量，但这个成员变量是无状态的，不可能有修改操作
+>     private UserDao userDao = new UserDaoImpl();
+>     
+>     public void update() {
+>         userDao.update();
+>     }
+> }
+>  
+> public class UserDaoImpl implements UserDao { 
+>     public void update() {
+>         String sql = "update user set password = ? where username = ?";
+>         // 是否安全？当然安全，根本没有成员变量
+>         try (Connection conn = DriverManager.getConnection("","","")){
+>             // ...
+>         } catch (Exception e) {
+>             // ...
+>         }
+>     }
+> }
+> ```
+>
+> ```java
+> public abstract class Test {
+>   public void bar() {
+>     // 是否安全？不安全
+>     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+>     foo(sdf);
+>   }
+> 	//其中foo的行为是不确定的，可能导致不安全的发生，被称之为外星方法
+>   public abstract foo(SimpleDateFormat sdf);
+>   public static void main(String[] args) {
+>     new Test().bar();
+>   }
+> }
+> public void foo(SimpleDateFormat sdf) {
+>   String dateStr = "1999-10-11 00:00:00";
+>   for (int i = 0; i < 20; i++) {
+>     new Thread(() -> {
+>       try {
+>         sdf.parse(dateStr);
+>       } catch (ParseException e) {
+>         e.printStackTrace();
+>       }
+>     }).start();
+>   }
+> }
+> ```
+>
+> > 现在明白为啥`String`类要设置成`final`了吗？
+> >
+> > 若不这样，则子类可能**覆盖**掉父类的方法，从而在覆盖方法中进行一些线程不安全的操作，破坏了原本方法的**安全性**
+
+---
+
+### 4.4 Monitor
+
+#### 4.4.1 Java对象头
+
+普通对象：
+
+```java
+|--------------------------------------------------------------|
+|                     Object Header (64 bits)                  |
+|------------------------------------|-------------------------|
+|        Mark Word (32 bits)         |    Klass Word (32 bits) |
+|------------------------------------|-------------------------|
+```
+
+数组对象：
+
+![image-20220331194846625](pics/image-20220331194846625.png)
+
+其中MarkWord结构为：
+
+<img src="pics/image-20220331194911325.png" alt="image-20220331194911325" style="zoom:67%;" />
+
+> 64位虚拟机MarkWord：
+>
+> <img src="pics/image-20220331194937281.png" alt="image-20220331194937281" style="zoom:67%;" />
+
+#### 4.4.2 Monitor工作原理
+
+> Monitor：监视器/管程
+
+每个Java对象都可以关联一个Monitor对象，如果使用`synchronized`给对象上锁(重量级)之后，该对象头的MarkWord中就设置了指向<u>Monitor对象的指针</u>
+
+> MarkWord中原本的数据会存在Monitor中，在退出时会重置
+
+<img src="pics/image-20220331195844050.png" alt="image-20220331195844050" style="zoom:67%;" />
+
+<img src="pics/image-20220331200025262.png" alt="image-20220331200025262" style="zoom:67%;" />
+
+<img src="pics/image-20220331200115071.png" alt="image-20220331200115071" style="zoom:67%;" />
+
+> Owner就是锁的持有者，EntryList可以理解成**阻塞队列**，其中的线程是BLOCKED状态
+
+从字节码角度理解：
+
+```java
+static final Object lock = new Object();
+static int counter = 0;
+ 
+public static void main(String[] args) {
+    synchronized (lock) {
+        counter++;
+    }
+}
+```
+
+```java
+public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+Code:
+      stack=2, locals=3, args_size=1
+         0: getstatic     #2   // <- lock引用 （synchronized开始）
+         3: dup
+         4: astore_1           // lock引用 -> slot 1
+         5: monitorenter       // 将 lock对象 MarkWord 置为 Monitor 指针
+         6: getstatic     #3   // <- i
+         9: iconst_1           // 准备常数 1
+        10: iadd               // +1
+        11: putstatic     #3   // -> i
+        14: aload_1            // <- lock引用
+        15: monitorexit        // 将 lock对象 MarkWord 重置, 唤醒 EntryList
+        16: goto          24
+        19: astore_2           // e -> slot 2 
+        20: aload_1            // <- lock引用
+        21: monitorexit        // 将 lock对象 MarkWord 重置, 唤醒 EntryList
+        22: aload_2            // <- slot 2 (e)
+        23: athrow             // throw e
+        24: return
+      Exception table:
+         from    to  target type
+             6    16    19   any
+            19    22    19   any
+      LineNumberTable:
+        line 8: 0
+        line 9: 6
+        line 10: 14
+        line 11: 24
+      LocalVariableTable:
+        Start  Length  Slot  Name   Signature
+            0      25     0  args   [Ljava/lang/String;
+      StackMapTable: number_of_entries = 2
+        frame_type = 255 /* full_frame */
+          offset_delta = 19
+          locals = [ class "[Ljava/lang/String;", class java/lang/Object ]
+          stack = [ class java/lang/Throwable ]
+        frame_type = 250 /* chop */
+          offset_delta = 4
+```
+
+> 出现异常了也可以正常解锁
+
+#### 4.4.3 synchronized进阶原理
+
+> `synchronized`最初的工作原理是让每个对象关联一个Monitor，
+> 但Monitor是操作系统提供的，使用时成本较高（重量级锁）；
+>
+> 而后进行了优化，不只可以使用Monitor，还可以使用轻量级锁、偏向锁
+
+
+
+
+
+
+
+
+
+
+
+---
+
+### 4.5 wait/notify
+
+
+
+
+
+
+
+----
+
+### 4.6 线程活跃状态
+
+
+
+
+
+
+
+
+
+----
+
+### 4.7 活跃性
+
+
+
+
+
+
+
+---
+
+### 4.8 Lock
+
+
+
 
 
 ---
@@ -605,6 +1079,8 @@ JUC版的：
   ```
 
   > ArrayList中的内部类`private class Itr implements Iterator<E> {...}`中的方法
+  >
+  > `ListItr`里也有这个方法；其实是只在迭代器中会出现的
 
   > `modCount`代表集合的**真实修改次数**；
   >

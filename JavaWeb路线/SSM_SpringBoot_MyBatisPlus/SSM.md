@@ -1697,6 +1697,37 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
     >这些对象是**<u>tomcat容器</u>**管理的
 
+#### (五) 补充：工厂创建对象
+
+使用**实例工厂**：
+
+- 重点：bean标签中的：
+
+  - `factory-bean`属性
+  - `factory-method`属性
+
+  <img src="pics/image-20220331205124541.png" alt="image-20220331205124541" style="zoom:67%;" />
+
+  > 相当于：
+  >
+  > <img src="pics/image-20220331205139670.png" alt="image-20220331205139670" style="zoom:80%;" />
+  >
+  > 注：不需要在实体类的标签中指定`class`属性了
+
+使用**静态工厂**：
+
+- 重点：bean标签中的
+
+  - `factory-bean`属性
+  - `factory-method`属性
+  - `class`属性
+
+  <img src="pics/image-20220331205541586.png" alt="image-20220331205541586" style="zoom:67%;" />
+
+  > 相当于：
+  >
+  > <img src="pics/image-20220331205556637.png" alt="image-20220331205556637" style="zoom:80%;" />
+
 ---
 
 ### 三、AOP面向切面编程
@@ -2855,7 +2886,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
   > > controllMethod(Xxx.valueOf(name1), Xxx.parseXxx(name2), ...);
   > > ```
   > >
-  > > $==\Rarr$***String***向**基本数据类型**转换时可能发生异常，出现400错误，所以建议使用<u>包装类型</u>，可以处理**空值**，减少异常
+  > > $==\Rarr$***String***向**基本数据类型**转换时可能发生异常，出现400(前端的bad request)错误，所以建议使用<u>包装类型</u>，可以处理**空值**，减少异常
   >
   > > name属性与形参名不同：
   > >
@@ -2891,30 +2922,30 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     >
     > ```xml
     > <filter>
-    >  <filter-name>characterEncodingFilter</filter-name>
-    >  <filter-class>
-    >      org.springframework.web.filter.CharacterEncodingFilter
-    >  </filter-class>
-    >  <init-param>
-    >      <!--项目使用的字符编码方式-->
-    >      <param-name>encoding</param-name>
-    >      <param-value>utf-8</param-value>
-    >  </init-param>
-    >  <init-param>
-    >      <!--request对象的字符编码方式-->
-    >      <param-name>forceRequestEncoding</param-name>
-    >      <param-value>true</param-value>
-    >  </init-param>
-    >  <init-param>
-    >      <!--response对象的字符编码方式-->
-    >      <param-name>forceResponseEncoding</param-name>
-    >      <param-value>true</param-value>
-    >  </init-param>
+    > <filter-name>characterEncodingFilter</filter-name>
+    > <filter-class>
+    >   org.springframework.web.filter.CharacterEncodingFilter
+    > </filter-class>
+    > <init-param>
+    >   <!--项目使用的字符编码方式-->
+    >   <param-name>encoding</param-name>
+    >   <param-value>utf-8</param-value>
+    > </init-param>
+    > <init-param>
+    >   <!--request对象的字符编码方式-->
+    >   <param-name>forceRequestEncoding</param-name>
+    >   <param-value>true</param-value>
+    > </init-param>
+    > <init-param>
+    >   <!--response对象的字符编码方式-->
+    >   <param-name>forceResponseEncoding</param-name>
+    >   <param-value>true</param-value>
+    > </init-param>
     > </filter>
     > <filter-mapping>
-    >  <filter-name>characterEncodingFilter</filter-name>
-    >  <!--强制所有请求先经过过滤器处理-->
-    >  <url-pattern>/*</url-pattern>
+    > <filter-name>characterEncodingFilter</filter-name>
+    > <!--强制所有请求先经过过滤器处理-->
+    > <url-pattern>/*</url-pattern>
     > </filter-mapping>
     > ```
     >
@@ -2925,11 +2956,112 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     > response.setCharacterEncoding(encoding);
     > ```
 
-> :star:补充:star:
+> 关于请求体中的数据格式：
 >
-> 获取**请求体**中的 JSON 格式数据：
+> - ***x-www-form-urlencoded***
 >
-> 用`@RequestBody`修饰实体类参数
+>   - 使用URLencode转码方法
+>
+>     > 就是常说的?key=value&key=value；
+>     >
+>     > 包括非ASCII字符做百分号编码(<u>需要用三个字符，效率低</u>)、空格替换成加号、使用?&=、...
+>
+>   - POST请求的默认格式
+>
+> - ***multipart/form-data***
+>
+>   - 可以传简单键值对，也能处理<u>复杂数据</u>，如**文件(文档、图片等)**
+>
+>     > 也是为了解决***x-www-form-urlencoded***类型不适合用于传输**大型二进制数据**或者包含**非ASCII字符**的数据
+>
+>   - 具体格式：以part为单位，part之间用boundray分隔
+>
+>     - 每个part必须包含`content-desposition`头，其值(也叫type)为`form-data`，后面还会用分号`;`相隔，接着一个`name`属性，其值为表单的字段名，如果是文件，后面还会用分号`;`相隔，接着一个`filename`属性，其值为文件名
+>     - content-type非必须属性，其值会根据文件类型自动变化，默认值是text/plain
+>     - （在数据内容之间会有一个空白行）
+>     - 空白行之后就是正式的**数据内容**了
+>
+> - ***raw***
+>
+>   - 可以上传任意格式的文本，可以上传text、json、xml、html等
+>
+> - ***binary***
+>
+>   - 相当于**Content-Type:application/octet-stream**，从字面意思得知，只可以上传二进制数据，通常用来上传文件，由于没有键值，所以，一次只能上传一个文件。
+>
+> 请求行中的数据格式：
+>
+> - query params，请求参数，也是URLencode，拼在URL后，放在请求行中
+
+> :star::star::star::star::star:==**controller参数接收问题大总结**==:star::star::star::star::star::star:
+>
+> $\Rarr$`@RequestBody`
+>
+> - 适用情况：POST请求且**请求体**中携带JSON数据(或XML)
+>
+>   > 不能处理x-www-form-urlencoded、x-www-form-urlencoded、binary，只适用于raw的JSON或者XML
+>
+> - 接收方法：
+>
+>   - 在形式参数列表中**只能使用一次**`@RequestBody`
+>
+>   - 用于修饰**实体类**，则直接向对象中赋值
+>
+>     >如果JSON对象中的属性值为空串，
+>     >则对于String类型来说，会接收到`""`，对于其他引用数据类型来说，会接收到`null`
+>
+>   - 用于修饰`String`，则直接把JSON字符串给String对象
+>
+> $\Rarr$`@RequestParam`
+>
+> - 适用情况（下面几种都行）
+>
+>   - GET请求
+>
+>     > GET请求是没有请求体的，参数都在**请求行**中，以key=value的形式存在，也就是query params，URLencode方式编码的
+>
+>   - POST请求且**请求体**中有简单键值对
+>
+>   > 无法直接解析请求体中的JSON（除非是当成一个字符串）
+>
+> - 接收方法：
+>
+>   - 修饰简单数据类型
+>
+>     - 如果不指定注解value属性，就会去寻找与参数名同名的key，找不到直接400
+>     - 如果指定注解value属性，就会去寻找与value属性值同名的key，找不到直接400
+>
+>     > 当然如果设置了requeire属性为false，则找不到就只会“赋值为null”，不报错
+>     >
+>     > > 所谓的“赋值为null”，其实是使用`Xxx.valueOf(null)`或者`Xxx.parseXxx(null)`去转换，所以基本数据类型就会直接报错了
+>
+>   - 想修饰对象引用？好像没这么用的，很奇怪
+>
+>   - 修饰数组：将数组名当成key，去寻找form-data参数，按顺序**都**存在数组中
+>
+> $\Rarr$`不使用注解修饰`
+>
+> - 适用情况：相当于require指定为false的@RequestParam
+>
+> - 接收方法
+>
+>   - 简单数据类型：和@RequestParam类似，省略不讲
+>
+>   - 对象
+>
+>     - 需要提供标准getter和setter，以及无参构造，同名属性直接赋值，找不到就null
+>
+>     - 想要@RequestParam那种检验功能？可以使用***Bean Validation***
+>
+>       > 需要引入相关依赖的。
+>       >
+>       > 常用的修饰属性的注解：@NotNull、@NotBlank、@Min、@Max
+>       >
+>       > 然后要在controller形式参数列表的对象引用前加@Validated
+>
+>       > 这个bean检验也可以结合着@RequestBody和@RequestParam去使用，同时修饰一个形参
+>
+>   - 数组：与@RequestParam类似
 
 
 #### (三) 处理器方法返回值

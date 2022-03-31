@@ -217,7 +217,7 @@ p.then(value => {
 - 可以**在浏览器端发送 Ajax**
 - 支持 **Promise 相关操作**
 - 可以在请求前做**准备工作**，在响应后对结果**预处理**
-- 可以对请求和响应数据做转换，可以自动转换成 **JSON**
+- 可以对请求和响应数据做转换，可以<u>自动转换成 **JSON**</u>
 - 可以取消请求
 - 可以做保护，阻挡攻击
 
@@ -320,8 +320,6 @@ p.then(value => {
 
   - axios 会自动将响应体以 <u>JSON</u> 格式的字符串**解析**，**封装为对象**
 
-    > 也就是说，用axios发POST请求，是在请求体中加入JSON格式字符串
-
 - header
   - 响应头
 
@@ -361,6 +359,8 @@ p.then(value => {
 - :star:headers
 
   - 对**请求头**信息进行一定配置
+
+  > 比如，默认的请求数据格式是：Content-Type: ‘application/json; charset=utf-8’，如果想改，就需要设置请求头中的`Content-Type`属性
 
 - :star:params
 

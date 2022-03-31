@@ -1300,29 +1300,386 @@ call 存储过程名称([参数列表])
 drop procedure [if exists] 存储过程名;
 ```
 
+#### (三) 变量
+
+##### 1、系统变量
+
+- 系统变量是MySQL服务器提供，不是用户定义的，属于**服务器**层面。
+
+- 分为**全局**变量(*GLOBAL*)、**会话**变量(*SESSION*) 。
+
+  > 比如，一个query console就是一个会话，一个终端就是一个会话，
+  > 也就是一次链接/一次Connection
+
+- 查看系统变量：
+
+  ```sql
+  show [session|global] variables; #查看所有系统变量
+  show [session|global] variables like '...'; #模糊匹配查看系统变量
+  select @@[session|global].系统变量名; #根据系统变量名查找
+  ```
+
+  > 不指定级别的情况下**默认**是`session`
+
+  > 举例：
+  >
+  > ```sql
+  > show variables like 'auto%';
+  > ```
+  >
+  > <img src="pics/image-20220330170319005.png" alt="image-20220330170319005" style="zoom:67%;" />
+
+- 设置系统变量
+
+  ```sql
+  set [session|global] 系统变量名 = 值;
+  set @@[session|global]系统变量名 = 值;
+  ```
+
+  > 注意，就算在会话中修改了全局变量，当***mysql*进程**重新启动后，还会恢复默认值；
+  >
+  > 如果想修改默认值，要去*/etc/my.cnf*中修改
+
+##### 2、用户自定义变量
+
+- 用户根据需要自己定义的变量，用户<u>不需要提前声明</u>，在用的时候直接用`@变量名`的语法就可以
+
+  > 系统变量用`@@`，用户自定义变量用`@`
+
+  > 用户定义的变量无需对其进行声明或初始化，
+  > 只不过不赋值时获取到的值为NULL，并不会报错
+
+- 其作用域默认为**当前链接/会话**
+
+- 赋值：
+
+  ```sql
+  set @var_name = expr [, @var_name = expr] ...;
+  set @var_name := expr [, @var_name := expr] ...;
+  select @var_name := expr [, @var_name := expr] ...;
+  select 字段名 into @var_name from 表名;
+  ```
+
+  > 推荐赋值时使用`:=`，因为在mysql中，`=`常用作判等
+  >
+  > > mysql中没有`==`
+
+- 使用：
+
+  ```sql
+  select @var_name [, @var_name] ...;
+  ```
+
+##### 3、局部变量
+
+- 局部变量是根据需要**定义**的<u>在局部生效</u>的变量，访问之前，需要<u>***DECLARE***声明</u>。
+
+- 可用作<u>存储过程</u>内的**局部变量**和**输入参数**，局部变量的**范围**是在其声明的`BEGIN .. END`块。
+
+- 声明：
+
+  ```sql
+  declare 变量名 变量类型 [default ...];
+  ```
+
+  > 变量类型和定义表时可以用的变量类型相同；
+  >
+  > 这个声明语句要放在存储过程定义的`begin ... end`中，其他位置不行，
+  > 下面的赋值和查看也是
+
+- 赋值：
+
+  ```sql
+  set 变量名 = 值;
+  set 变量名 := 值;
+  select 字段名 into 变量名 from 表名 ...;
+  ```
+
+  > 注意不能用`select 变量名 := 值`这种设置用户变量的语法了
+
+- 查看：
+
+  ```sql
+  select 变量名
+  ```
+
+#### (四) 参数
+
+IN 类型
+
+- 输入参数，调用时需要传入值
+
+OUT 类型
+
+- 输出参数，参数可以作为返回值
+
+  > 也是写在参数列表里，一般要通过**用户自定义变量**接收
+
+INOUT 类型
+
+- 既可以作为输入参数，也可以作为输出参数
+
+  > 需要传入一个初始化过的用户变量（这个用户变量也作为**接收**使用）
+
+语法：
+
+```sql
+create procedure 存储过程名称([[in|out|inout] 参数名 参数类型]) begin
+	SQL语句;
+end;
+```
+
+> 默认是`in`类型
+
+> 举例：
+>
+> ```sql
+> create procedure p4(in score int, out result varchar(10)) begin
+>     # declare score int default 58;
+>     # declare result varchar(10);
+>     if score >= 85 then
+>         set result := '优秀';
+>     elseif score >= 60 then
+>         set result := '及格';
+>     else
+>         set result := '不及格';
+>     end if;
+>     # select result;
+> end;
+> call p4(98, @result);
+> select @result;
+> ```
+>
+> ```sql
+> create procedure p5(inout score double) begin
+>     set score := score * 0.5;
+> end;
+> set @score := 78;
+> call p5(@score);
+> select @score;
+> ```
+
+#### (五) 程序流程控制
+
+- if条件判断：
+
+  ```sql
+  if 条件1 then
+  	...
+  elseif 条件2 then #可选
+  	...
+  else #可选
+  	...
+  end if;
+  ```
+
+- case分支
+
+  ```sql
+  case case_value
+  	when when_value1 then statement_list1
+  	[when when_value2 then statement_list2]
+  	...
+  	[else statement_list]
+  end case;
+  ```
+
+  ```sql
+  case
+  	when search_condition1 then statement_list1
+  	[when search_condition1 then statement_list1]
+  	...
+  	[else statement_list]
+  end case;
+  ```
+
+  > 这个第二种用法就和if几乎相同了
+
+- while循环
+
+  ```sql
+  while 条件 do
+  	SQL逻辑...
+  end while;
+  ```
+
+- repeat循环
+
+  ```sql
+  repeat
+  	SQL逻辑...
+  	until 条件
+  end repeat
+  ```
+
+  > 满足条件了则退出循环；一定会执行一次
+
+- loop循环
+
+  - LOOP实现简单的循环，
+    如果不在SQL逻辑中增加**退出循环**的条件，可以用其来实现简单的**死循环**。
+  - LOOP可以配合一下两个语句使用:
+    - `leave`：配合循环使用，退出循环。
+    - `interate`：必须用在循环中，作用是跳过当前循环剩下的语句，直接进入下一次循环。
+
+  ```sql
+  [begin_label:] loop
+  	SQL逻辑...
+  	[leave label;] # break
+  	[iterate label;] # continue
+  end loop [end_label];
+  ```
 
 
+#### (六) 游标、条件处理程序
 
+> 局部变量只能接收单行单列的数据。如果想接收结果集，该用什么呢？
 
+游标(*CURSOR*)是用来<u>存储查询**结果集**</u>的数据类型，
+在**存储过程**和**函数**中可以使用游标对结果集进行循环的处理。
 
+游标的使用包括游标的声明、OPEN、FETCH 和CLOSE，其语法分别如下：
 
+- 声明：
 
+  ```sql
+  declare 游标名称 cursor for 查询语句;
+  ```
 
+  > 注：游标的声明要先于**局部变量**
 
+- 打开游标：
 
+  ```sql
+  open 游标名称;
+  ```
 
+  > 使用游标前必须先打开游标 
 
+- 获取游标记录
 
+  ```sql
+  fetch 游标名称 into 变量[, 变量 ...];
+  ```
 
+  > 通常**获取记录**这个操作会放在<u>循环结构</u>中，需要用**局部变量**去接收结果；
+  >
+  > 怎么判断游标已经获取完了所有记录？需要用到下面提到的**条件处理程序**。
 
+- 关闭游标
+
+  ```sql
+  close 游标名称;
+  ```
+
+条件处理程序（*Handler*）可以用来定义在流程控制结构执行过程中<u>**遇到问题**时相应的处理步骤</u>。
+具体语法为：
+
+```sql
+declare hander_action 
+	handler for condition_value[, condition_value] ... statement;
+```
+
+> handler_action：
+>
+> ```sql
+> continue #继续执行当前程序
+> exit # 终止当前程序
+> ```
+>
+> condition
+>
+> ```sql
+> sqlstate sqlstate_value # 状态码，如02000
+> sqlwarning # 所有以01开头的SQLSTATE代码的简写
+> not found # 所有以02开头的SQLSTATE代码的简写
+> sqlexception # 所有没被sqlwarning或not found捕获的sqlstate代码的简写
+> ```
+
+> 游标与条件处理程序联合应用举例：
+>
+> ```sql
+> create procedure p12() begin
+>     declare u_name varchar(32);
+>     declare u_phone varchar(16);
+>     declare u_cursor cursor for select name, phone from t_admin;
+> 
+> 		#下面的sqlstate'02000'改成not found也行(在这个需求下)
+>     declare exit handler for sqlstate '02000' close u_cursor;
+> 		
+>     open u_cursor;
+>     while true do
+>         fetch u_cursor into u_name, u_phone;
+>         select u_name, u_phone;
+>     end while;
+> end;
+> ```
 
 ---
 
 ### 三、存储函数
 
+#### (一) 概述
 
+存储函数是<u>有返回值</u>的**存储过程**，且存储函数的<u>参数只能是`IN`类型</u>的。
 
+#### (二) 语法
 
+创建：
+
+```sql
+create function 存储函数名([参数列表])
+returns 返回值类型 [characteristic ...]
+begin
+	SQL逻辑;
+	return ...;
+end
+```
+
+> 关于`characteristic`(特性)：
+>
+> - `determinstic`：相同的输入参数总是产生**相同的结果**
+> - `no sql`：不包含SQL语句
+> - `reads sql data`：包含**读取数据**的SQL语句，但不包含**写入数据**的语句
+>
+> 在二进制日志开启的情况下，就必须指定`characteristic`
+>
+> > MySQL8.x默认就开启
+
+调用：
+
+```sql
+select 存储函数名([参数值]);
+set @var_name := 存储函数名([参数值]);
+```
+
+> 调用的时候不用`call`关键字，直接写函数名即可；
+>
+> 必须用某种方式接收返回值，不能直接调用就完了
+
+> 举例：
+>
+> ```sql
+> create function fun(n int)
+>     returns int deterministic
+> begin
+>     declare total int default 0;
+>     while n > 0
+>         do
+>             set total := total + n;
+>             set n := n - 1;
+>         end while;
+>     return total;
+> end;
+> 
+> select fun(100);
+> ```
+
+#### (三) 补充
+
+存储函数中的**其他程序流程控制**与存储过程相同。
+
+存储函数相对于存储过程来说用得比较少，因为能用存储函数解决的，也可以用存储过程解决。
 
 ----
 
