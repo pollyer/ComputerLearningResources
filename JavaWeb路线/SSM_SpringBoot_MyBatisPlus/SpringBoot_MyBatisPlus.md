@@ -544,6 +544,34 @@ $\Rarr$@ConfigurationProperties
        username: root
        password: 123456
    ```
+   
+   > SpringBoot默认使用hikari连接池，有默认配置，如果想进行其他配置，可以参考下面这个：
+   >
+   > ```yaml
+   > spring:
+   >   datasource:
+   >     driver-class-name: com.mysql.cj.jdbc.Driver
+   >     url: jdbc:mysql://localhost:3306/yeb?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+   >     username: root
+   >     password: 123456
+   >     hikari:
+   >       # 连接池名
+   >       pool-name: DateHikariCP
+   >       # 最小空闲连接数
+   >       minimum-idle: 5
+   >       # 空闲连接存活最大时间，默认600000(10分钟)
+   >       idle-timeout: 180000
+   >       # 最大连接数，默认10
+   >       maximum-pool-size: 10
+   >       # 从连接池返回的连接的自动提交
+   >       auto-commit: true
+   >       # 连接池最大存活时间，0表示永久存活，默认1800000（30分钟）
+   >       max-lifetime: 1800000
+   >       # 连接超时时间，默认30000（30秒）
+   >       connection-timeout: 30000
+   >       # 测试连接是否可用的查询语句
+   >       connection-test-query: SELECT 1
+   > ```
 
 #### (二) @MapperScan
 
@@ -1378,11 +1406,11 @@ public class CorsConfig implements WebMvcConfigurer {
 
   > key：字段名，value：要删除记录对应的值；
   >
-  > Map 集合内多个元素是<u>==`and`的关系==</u>
+  > Map 集合内多个元素是<u>==and的关系==</u>
 
 - `deleteBatchIds`方法：按主键批量删除，参数是`Collection`
 
-  > 底层是==`in`语句==；
+  > 底层是==in语句==；
   >
   > 可以结合 Lambda 表达式快速生成`List`集合，举例：
   >

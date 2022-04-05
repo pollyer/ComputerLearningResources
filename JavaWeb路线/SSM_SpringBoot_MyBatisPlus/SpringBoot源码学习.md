@@ -99,7 +99,7 @@
 
 #### 1.3 结论
 
-- **非懒加载**的**单实例**bean会在容器创建时创建，容器内部会创建一个`beanFactory`，调用其`doGetBean`方法，内部还会再调用一个`getSingleton`方法，<u>发现还没有创建单例</u>，之后就会通过**反射**，使用**策略模式**，创建对象。创建后会在`addSingleton`方法中，将bean存储到一个单例bean的map集合(`singletonObjects`)中，key就是id，value就是bean对象
+- **非懒加载**的**单实例**bean会在容器创建时创建，容器内部会创建一个`beanFactory`，调用其`doGetBean`方法，内部还会再调用一个`getSingleton`方法，<u>发现还没有创建单例</u>，之后就会通过**反射**，使用**策略模式**，调用**无参构造**，创建对象。创建后会在`addSingleton`方法中，将bean存储到一个单例bean的map集合(`singletonObjects`)中，key就是id，value就是bean对象
 - 调用容器`getBean`方法获取对象时，也调用了`doGetBean`方法，进而调用`getSingleton`方法，在存储单例bean的map集合(`singletonObjects`)中获取到key为id的bean
 
 #### 1.4 疑问

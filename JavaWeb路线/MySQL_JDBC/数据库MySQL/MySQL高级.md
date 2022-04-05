@@ -103,12 +103,14 @@
 
 - *磁盘文件*
 
-  ==***ibd* 表空间文件**==
+  ==***idb* 表空间文件**==
 
   innoDB引擎的每张表都会对应这样一个表空间文件【***xxx.idb***，xxx代表<u>表名</u>】，
-  存储该表的**表结构**(frm、 sdi)、**数据**和**索引**。
+  存储该表的**表结构**(sdi)、**数据**和**索引**。
 
-  > .frm是**表结构**文件，MySQL8.0后，frm存储在sdi数据字典中，而sdi又融入到ibd中
+  > .frm原本是**表结构**文件，
+  > 但MySQL8.0后，frm被融入到新出的sdi数据字典中，
+  > 而在InnoDB存储引擎中，sdi又融入到ibd中
 
   > 一个重要参数：`innodb_file_per_table`
   >
@@ -134,15 +136,15 @@
 
 - *特点*
 
-  - 不支持事务，不支持外键
-  - 支持表锁，不支持行锁
+  - 不支持<u>事务</u>，不支持<u>外键</u>
+  - 支持**表锁**，不支持<u>行锁</u>
   - 访问速度快
 
 - *磁盘文件*
 
   - xxx.sdi：存储**表结构**信息
 
-    > 文本文件，存放JSON格式数据
+    > Serialized Dictionary Information；文本文件，存放JSON格式数据
 
   - xxx.MYD：存储**数据**
 
@@ -1096,7 +1098,7 @@ show session|global status like 'Com_______'
 
 ---
 
-## 存储对象
+## 数据库对象
 
 ---
 
@@ -1685,12 +1687,63 @@ set @var_name := 存储函数名([参数值]);
 
 ### 四、触发器
 
+#### (一) 概述
 
+触发器是**与表有关**的数据库对象，
+指在insert/update/delete之前或之后，<u>触发并执行</u>触发器中定义的**SQL语句集合**。
 
+触发器的这种特性可以协助应用在数据库端确保<u>数据的完整性</u>，并进行日志记录、数据校验等操作。
 
+使用别名OLD和NEW来引用触发器中<u>发生变化的**行记录**内容</u>
 
+> 这与其他的数据库是相似的。
+>
+> <img src="pics/image-20220404085952571.png" alt="image-20220404085952571" style="zoom:67%;" />
 
+现在触发器还只支持**行级触发**，不支持语句级触发。
 
+> DML语句影响了多少行，就触发多少次，而不是一条DML语句只触发一次
 
+#### (二) 语法
 
-----
+创建触发器：
+
+```sql
+create trigger trigger_name
+before|after insert|update|delete
+on tbl_name for each row # 行级触发器
+begin
+	trigger_stmt;
+end;
+```
+
+查看触发器：
+
+```sql
+show triggers
+```
+
+删除触发器：
+
+```sql
+drop trigger [schema_name.]trigger_name;
+```
+
+> 如果没有指定数据库名，默认为当前数据库
+
+> :star:总结：
+>
+> DQL===>视图
+>
+> DML+DQL===>存储过程
+>
+> DML===>触发器
+
+---
+
+---
+
+## 锁
+
+---
+

@@ -739,7 +739,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     >
     > 推荐使用 resultMap
 
-- :star:进阶使用：多对一关系的处理（举例：员工对部门）
+- :star:进阶使用：多对一关系的处理（有一个属性是<u>另一个实体类对象的**引用**</u>，举例：员工对部门）
 
   - 级联属性：在 <u>property 属性</u>中通过`.`的方式指定引用属性中的属性
 
@@ -767,7 +767,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
       </association>
       ```
 
-    > 还有第二种方式：
+    > 还有第二种方式：将分步查询单独拿出来
     >
     > property 属性依然是引用属性名
     >
@@ -802,7 +802,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     >
     > > 注：当开启全局加载后，fetchType 属性才有意义
 
-- :star:进阶使用：一对多关系的处理（举例：部门对员工）
+- :star:进阶使用：一对多关系的处理（有一个属性是<u>实体类**集合**</u>，举例：部门对员工）
 
   - 在 resultMap 标签体中，使用 <u>`collection`标签</u>代表**集合**引用属性
 
@@ -814,7 +814,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
       > 注意 ofType 的含义是**集合中的类型**，与 javaType 含义不同
       >
-      > > 引用类型设置 xxxType 是为了处理**多态**的情况，不然怎么知道到底使用了哪个实现类
+      > > 引用类型设置 xxxType 是为了处理**多态**的情况，不然怎么知道到底使用哪个实现类
 
   - 在 collection 标签体中：
 
@@ -3415,13 +3415,13 @@ List<Student> selectByNameOrAge(@Param("name") String name,
   > - 会将 mv 中的数据转换成**字符串**，以name=value的形式拼接在URL后面
   > - 相当于给重定向的下一次请求增加了**GET参数**(param)
 
-#### (二)异常处理
+#### (二):star:统一异常处理
 
 > 框架使用的是集中异常处理，把Controller中抛出的异常都集中到一个地方处理；
 >
 > >service 和 dao 层的异常也是抛到 controller 层
 >
-> 由**异常处理器**处理异常，==统一异常处理==；
+> 由**异常处理器**处理异常，==统一异常处理==；将异常的处理==解耦合==出来
 >
 > 有两个相关注解：`@ExceptionHandler`和`@ControllerAdvice`
 
@@ -3447,7 +3447,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
 2. 创建一个**异常处理类**，用<u>`@ControllerAdvice`</u>修饰这个类
 
-3. 在异常处理类中方法的定义格式与`Controller`方法的**定义格式相同**，还要有一个***Exception*类型的参数**，用于接收异常
+3. 在异常处理类中方法的定义格式与`Controller`方法的**定义格式相同**，要有一个***Exception*类型的参数**，用于接收异常
 
 4. 用`@ExceptionHandler`修饰方法，属性`value`是要处理的**异常类型(.*class*)**
 
@@ -3465,6 +3465,16 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 5. 在SpringMVC的配置文件中声明组件扫描器，扫描**异常处理包**
 
 6. 加入**注解驱动**
+
+##### 3、补充：实现HandlerExceptionResolver
+
+1. 自定义类实现`HandlerExceptionResolver`接口
+
+2. 重写方法`resolveException(request, response, handler, ex)`
+
+   > 这个方法的返回值是`ModelAndView`，主要用于模板引擎开发的。
+
+3. 将自定义类注入容器
 
 #### (三) 拦截器
 
@@ -3612,14 +3622,24 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 > }
 > ```
 
-- *拦截器与过滤器*
+- *:star:拦截器与过滤器*
+  
   - 拦截器是**SpringMVC框架**中的对象，过滤器是**Servlet规范**中的对象
+  
+    > 拦截器是AOP的一种实现
+  
   - 拦截器是**框架容器**创建的，过滤器是**Tomcat容器**创建的
+  
   - 拦截器侧重**对请求处理**，可以截断请求；
     过滤器侧重**对request和response对象进行操作**
+    
   - 拦截器的执行时间有三个(控制器方法之前、控制器方法之后、请求处理完成后)；
-    过滤器的执行时间是**请求之前**
+    过滤器的主要执行时间是**请求之前**
+    
+    > 当然，Filter也可以在doFilter之后写代码，在请求处理结束后返回时也会执行，只不过意义不大，此时对response对象的修改也没用
+    
   - 拦截器主要用于拦截**动态资源**请求，过滤器可以过滤**静态和动态资源**请求
+  
   - 执行顺序：==**过滤**器$\Rarr$**中央调度**器$\Rarr$**拦截**器$\Rarr$**控制**器==
 
 #### (四) SpringMVC执行流程
