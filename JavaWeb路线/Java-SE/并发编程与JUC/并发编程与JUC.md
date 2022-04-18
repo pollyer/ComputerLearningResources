@@ -32,9 +32,9 @@
 
 #### 1.1.3 进程与线程对比
 
-进程基本上**相互==独立==**的，而线程存在于进程内，是进程的一个子集；
+进程之间基本上**相互==独立==**的，而线程存在于进程内，是进程的一个子集；
 
-进程拥有共享的资源，如内存空间等，供**其内部的线程==共享==**；
+进程拥有资源，如内存空间等，供**其内部的线程==共享==**；
 
 **进程间==通信==**较为复杂：
 
@@ -226,7 +226,9 @@ TimeUnit.时间单位枚举.sleep(时间数值)
 
 #### 2.2.4 join新理解
 
-join其实就是一种**同步**，等待另一个线程的执行，这种同步也可以是**限时**的（*timeout*）
+join其实就是一种**同步**，等待另一个线程的执行，这种同步也可以是**限时**的
+
+> 可以传入*timeout*参数
 
 #### 2.2.5 守护线程实例
 
@@ -1379,13 +1381,15 @@ c.i.MyBenchmark.b    avgt        5  16.976        1.572  ns/op
 #### 4.5.2 相关API介绍
 
 - `obj.wait()` 让进入 object 监视器的线程到 waitSet 等待
-- `obj.notify()` 在 object 上正在 waitSet 等待的线程中挑一个唤醒 
+- `obj.notify()` 在 object 上正在 waitSet 等待的线程中<u>随机</u>挑一个唤醒 
 - `obj.notifyAll()` 让 object 上正在 waitSet 等待的线程全部唤醒
 
 >它们都是线程之间进行协作的手段，都属于 Object 对象的方法。
 >必须获得此对象的锁，才能调用这几个方法
 >
 >> 不然抛异常：`java.lang.IllegalMonitorStateException`
+>>
+>>  if the current thread is not the owner of the object's monitor.
 
 >关于`wait`方法的参数问题
 >
@@ -1401,6 +1405,596 @@ c.i.MyBenchmark.b    avgt        5  16.976        1.572  ns/op
 - sleep 在睡眠的同时，**不会释放对象锁**的，但 wait 在等待的时候会释放对象锁
 - sleep 方法必须传参数，并进入 TIMED_WAITING 状态；wait 方法不传参就会进入WAITING状态，传参了就会进入 TIMED_WAITING 状态
 
+避免<u>虚假唤醒</u>问题的使用模板：
+
+```java
+synchronized(lock) {
+    while(条件不成立) {
+        lock.wait();
+    }
+    // 干活
+}
+ 
+//另一个线程
+synchronized(lock) {
+    lock.notifyAll();
+}
+```
+
+#### 4.5.4 保护性暂停模式
+
+即 Guarded Suspension，用在<u>一个线程等待另一个线程</u>的执行结果，要点：
+
+- 有一个**结果**需要从一个线程传递到另一个线程，让他们关联同一个 `GuardedObject`
+- 如果有结果不断从一个线程到另一个线程那么可以使用**消息队列**（见生产者/消费者）
+- JDK 中，join 的实现、Future 的实现，采用的就是此模式
+- 因为要等待另一方的结果，因此归类到**同步模式**
+
+代码实现：
+
+```java
+class GuardedObject {
+  private Object response;
+  private final Object lock = new Object();
+
+  public Object get() {
+    synchronized (lock) {
+      // 条件不满足则等待
+      while (response == null) {
+        try {
+          lock.wait();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      return response;
+    }
+  }
+  public void complete(Object response) {
+    synchronized (lock) {
+      // 条件满足，通知等待线程
+      this.response = response;
+      lock.notifyAll();
+    }
+  }
+}
+```
+
+> 与 join 相比的优点：
+>
+> - 不必等待一个线程完全结束，阶段性结束拿到结果即可
+> - 要等待的结果可以是局部的（join必须是全局的）
+
+$\Rarr$带超时的`GaurdedObject`
+
+```java
+class GuardedObjectV2 {
+
+  private Object response;
+  private final Object lock = new Object();
+  public Object get(long millis) {
+    synchronized (lock) {
+      // 1) 记录最初时间
+      long begin = System.currentTimeMillis();
+      // 2) 已经经历的时间
+      long timePassed = 0;
+      while (response == null) {
+        // 4) 假设 millis 是 1000，结果在 400 时唤醒了，那么还有 600 要等
+        long waitTime = millis - timePassed;
+        log.debug("waitTime: {}", waitTime);
+        if (waitTime <= 0) {
+          log.debug("break...");
+          break;
+        }
+        try {
+          lock.wait(waitTime);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        // 3) 如果提前被唤醒，这时已经经历的时间假设为 400
+        timePassed = System.currentTimeMillis() - begin;
+        log.debug("timePassed: {}, object is null {}", 
+                  timePassed, response == null);
+      }
+      return response;
+    }
+  }
+
+  public void complete(Object response) {
+    synchronized (lock) {
+      // 条件满足，通知等待线程
+      this.response = response;
+      log.debug("notify...");
+      lock.notifyAll();
+    }
+  }
+}
+```
+
+> 注意这种方式下，对于**虚假唤醒**的处理，关键是记录**已经等待的时间**并求出**还要等待的时间**；
+>
+> 每次睡醒之后，要记录一下<u>已经睡了多长时间</u>；每次睡的时间是<u>计划时间减去已经睡的时间</u>
+
+$\Rarr$多任务`Gaurded Object`
+
+> 和上面的有什么区别？
+>
+> - `GaurdedObject`新增了个`id`（之后就知道`id`有啥用了）
+>
+> - 有<u>多对线程来产生结果与获取结果</u>，如果再像上面那样用主环境类保存所有`GaurdedObject`，就太乱了，还要给每个线程分别把`GaurdedObject`传过去，耦合度特别高
+>
+>   > 注意，保持**一一对应**，如果出现一对多的话就是<u>生产者与消费者模式</u>了
+>
+> - 使用一个**中间解耦类**来<u>静态地</u>保存所有`GaurdedObject`
+>
+> - 将线程包装成**业务相关类**
+
+新增 id 用来标识 `Guarded Object`
+
+```java
+class GuardedObject {
+  // 标识 Guarded Object
+  private int id;
+  public GuardedObject(int id) {
+    this.id = id;
+  }
+  public int getId() {
+    return id;
+  }
+  // 结果
+  private Object response;
+  // 获取结果
+  // timeout 表示要等待多久 2000
+  public Object get(long timeout) {
+    synchronized (this) {
+      // 开始时间 15:00:00
+      long begin = System.currentTimeMillis();
+      // 经历的时间
+      long passedTime = 0;
+      while (response == null) {
+        // 这一轮循环应该等待的时间
+        long waitTime = timeout - passedTime;
+        // 经历的时间超过了最大等待时间时，退出循环
+        if (timeout - passedTime <= 0) {
+          break;
+        }
+        try {
+          this.wait(waitTime); // 虚假唤醒 15:00:01
+        } catch (InterruptedException e) {
+
+          e.printStackTrace();
+        }
+        // 求得经历时间
+        passedTime = System.currentTimeMillis() - begin; // 15:00:02  1s
+      }
+      return response;
+    }
+  }
+  // 产生结果
+  public void complete(Object response) {
+    synchronized (this) {
+      // 给结果成员变量赋值
+      this.response = response;
+      this.notifyAll();
+    }
+  }
+}
+```
+
+**中间解耦类**
+
+```java
+class Mailboxes {
+  private static Map<Integer, GuardedObject> boxes = new Hashtable<>();
+  private static int id = 1;
+  // 产生唯一 id
+  private static synchronized int generateId() {
+    return id++;
+  }
+  public static GuardedObject getGuardedObject(int id) {
+    return boxes.remove(id);
+  }
+  public static GuardedObject createGuardedObject() {
+    GuardedObject go = new GuardedObject(generateId());
+    boxes.put(go.getId(), go);
+    return go;
+  }
+  public static Set<Integer> getIds() {
+    return boxes.keySet();
+  }
+}
+```
+
+业务相关类
+
+```java
+class People extends Thread{
+  @Override
+  public void run() {
+    // 收信
+    GuardedObject guardedObject = Mailboxes.createGuardedObject();
+    log.debug("开始收信 id:{}", guardedObject.getId());
+    Object mail = guardedObject.get(5000);
+    log.debug("收到信 id:{}, 内容:{}", guardedObject.getId(), mail);
+  }
+}
+class Postman extends Thread {
+  private int id;
+  private String mail;
+  public Postman(int id, String mail) {
+    this.id = id;
+    this.mail = mail;
+  }
+  @Override
+  public void run() {
+    GuardedObject guardedObject = Mailboxes.getGuardedObject(id);
+    log.debug("送信 id:{}, 内容:{}", id, mail);
+    guardedObject.complete(mail);
+  }
+}
+```
+
+环境类/测试
+
+```java
+public static void main(String[] args) throws InterruptedException {
+  for (int i = 0; i < 3; i++) {
+    new People().start();
+  }
+  Sleeper.sleep(1);
+  for (Integer id : Mailboxes.getIds()) {
+    new Postman(id, "内容" + id).start();
+  }
+}
+```
+
+#### 4.5.5 join的原理
+
+> 完全就是保护性暂停的原理
+
+```java
+public final synchronized void join(long millis)
+  throws InterruptedException {
+  long base = System.currentTimeMillis();
+  long now = 0;
+
+  if (millis < 0) {
+    throw new IllegalArgumentException("timeout value is negative");
+  }
+
+  if (millis == 0) {
+    while (isAlive()) {
+      wait(0);
+    }
+  } else {
+    while (isAlive()) {
+      long delay = millis - now;
+      if (delay <= 0) {
+        break;
+      }
+      wait(delay);
+      now = System.currentTimeMillis() - base;
+    }
+  }
+}
+```
+
+> 注：
+>
+> - `wait`不是实例方法吗，前面咋能啥引用也不写呢？因为不写相当于`this.`
+>
+> - 想想这个`join`方法是谁调的？在(相对)主线程调用的，所以是谁`wait`，`wait`在哪个对象上？
+>
+>   - 是主线程`wait`
+>
+>     > 因为`wait`是在主线程的指令流中
+>
+>   - `wait`在被join的线程对象上
+
+#### 4.5.6 生产者与消费者模式
+
+要点：
+
+- 与前面的保护性暂停中的 `GuardObject `不同，不需要产生结果和消费结果的线程**一一对应**
+
+  > 共同点是都是一方线程产生数据，另一方线程消费数据
+
+- **<u>消费队列</u>**可以用来<u>平衡生产和消费的线程资源</u>
+
+- 生产者**仅负责产生**结果数据，不关心<u>数据该如何处理</u>，而消费**者专心处理结果数据**
+
+- 消息队列是有**容量限制**的，满时不会再加入数据，空时不会再消耗数据
+
+- JDK 中各种**<u>阻塞队列</u>**，采用的就是这种模式
+
+<img src="pics/image-20220412153250804.png" alt="image-20220412153250804" style="zoom:67%;" />
+
+> 因为没有了一一对应的关系，同类数据等价的，而且产生的数据也不一定被立刻使用，所以认为其是【**异步模型**】
+
+实现：
+
+- 数据类
+
+  ```java
+  class Message {
+    private int id;
+    private Object message;
+  
+    public Message(int id, Object message) {
+      this.id = id;
+      this.message = message;
+    }
+  
+    public int getId() {
+      return id;
+    }
+  
+    public Object getMessage() {
+      return message;
+    }
+  }
+  ```
+
+- 消息队列类：
+
+  ```java
+  class MessageQueue {
+    private Queue<Message> queue;
+    private int capacity;
+  
+    public MessageQueue(int capacity) {
+      this.capacity = capacity;
+      queue = new LinkedList<>();
+    }
+  
+    public Message take() {
+      synchronized (queue) {
+        while (queue.isEmpty()) {
+          log.debug("没货了, wait");
+          try {
+            queue.wait();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+        Message message = queue.poll();
+        queue.notifyAll();
+        return message;
+      }
+    }
+  
+    public void put(Message message) {
+      synchronized (queue) {
+        while (queue.size() == capacity) {
+          log.debug("库存已达上限, wait");
+          try {
+            queue.wait();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+        }
+        queue.offer(message);
+        queue.notifyAll();
+      }
+    }
+  }
+  ```
+
+  > 锁`queue`而不是`this`可以保证**细粒度**
+
+- 环境类/测试
+
+  ```java
+  MessageQueue messageQueue = new MessageQueue(2);
+  // 4 个生产者线程, 下载任务
+  for (int i = 0; i < 4; i++) {
+    int id = i;
+    new Thread(() -> {
+      try {
+        log.debug("download...");
+        List<String> response = Downloader.download();
+        log.debug("try put message({})", id);
+        messageQueue.put(new Message(id, response));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }, "生产者" + i).start();
+  }
+  // 1 个消费者线程, 处理结果
+  new Thread(() -> {
+    while (true) {
+      Message message = messageQueue.take();
+      List<String> response = (List<String>) message.getMessage();
+      log.debug("take message({}): [{}] lines", message.getId(), response.size());
+    }
+  
+  }, "消费者").start();
+  ```
+
+### 4.6 park/unpark
+
+#### 4.6.1 基本使用
+
+`LockSupport`类中的静态方法
+
+- 暂停当前线程
+
+  ```java
+  LockSupport.park(); 
+  ```
+
+- 恢复某个线程的运行
+
+```java
+LockSupport.unpark(被暂停线程对象)
+```
+
+先`park`再`unpark`：
+
+```java
+Thread t1 = new Thread(() -> {
+    log.debug("start...");
+    sleep(1);
+    log.debug("park...");
+    LockSupport.park();
+    log.debug("resume...");
+},"t1");
+t1.start();
+sleep(2);
+log.debug("unpark...");
+LockSupport.unpark(t1);
+```
+
+```console
+18:42:52.585 c.TestParkUnpark [t1] - start... 
+18:42:53.589 c.TestParkUnpark [t1] - park... 
+18:42:54.583 c.TestParkUnpark [main] - unpark... 
+18:42:54.583 c.TestParkUnpark [t1] - resume... 
+```
+
+先`unpark`再`park`：
+
+```java
+Thread t1 = new Thread(() -> {
+    log.debug("start...");
+    sleep(2);
+    log.debug("park...");
+    LockSupport.park();
+    log.debug("resume...");
+}, "t1");
+t1.start();
+sleep(1);
+log.debug("unpark...");
+LockSupport.unpark(t1);
+```
+
+```console
+18:43:50.765 c.TestParkUnpark [t1] - start... 
+18:43:51.764 c.TestParkUnpark [main] - unpark... 
+18:43:52.769 c.TestParkUnpark [t1] - park... 
+18:43:52.769 c.TestParkUnpark [t1] - resume... 
+```
+
+#### 4.6.2 特点
+
+与 Object 的 wait & notify 相比：
+
+- wait，notify 和 notifyAll 必须配合 *Object Monitor* 一起使用，而 park，unpark 不必
+- park & unpark 是**以线程为单位**来【阻塞】和【唤醒】线程，而 notify 只能随机唤醒一个等待线程，notifyAll 是唤醒所有等待线程，就不那么【精确】
+- park & unpark 可以先 unpark，而 wait & notify 不能先 notify
+
+#### 4.6.3 原理
+
+每个线程都有自己的一个` Parker `对象，由三部分组成` _counter` ，` _cond` 和` _mutex` 
+
+> 这个`Parker`是`native C++`的
+
+打个比喻：
+
+- 线程就像一个旅人，`Parker `就像他随身携带的背包，条件变量`_cond`就好比背包中的帐篷。
+  `_counter `就好比背包中的备用干粮（0 为耗尽，1 为充足）
+- 调用 `park `就是要看需不需要停下来歇息
+  - 如果备用干粮耗尽，那么钻进帐篷歇息
+  - 如果备用干粮充足，那么不需停留，继续前进
+- 调用 `unpark`，就好比令干粮充足
+  - 如果这时线程还在帐篷，就唤醒让他继续前进
+  - 如果这时线程还在运行，那么下次他调用 `park `时，仅是消耗掉备用干粮，<u>不需停留</u>，继续前进
+    - 因为背包空间有限，多次调用` unpark `仅会补充一份备用干粮
+
+调用`park`且`_counter`为0：
+
+<img src="pics/image-20220412170944152.png" alt="image-20220412170944152" style="zoom:67%;" />
+
+> 1. 当前线程调用 Unsafe.park() 方法
+> 2. 检查 _counter ，本情况为 0，这时，获得 _mutex 互斥锁
+> 3. 线程进入 _cond 条件变量阻塞
+> 4. 设置 _counter = 0
+
+在`park`后调用`unpark`：
+
+<img src="pics/image-20220412171500572.png" alt="image-20220412171500572" style="zoom:67%;" />
+
+> 1. 调用 Unsafe.unpark(Thread_0) 方法，设置 _counter 为 1
+> 2. 唤醒 _cond 条件变量中的 Thread_0
+> 3. Thread_0 恢复运行
+> 4. 设置 _counter 为 0
+
+先调用`unpark`再调用`park`：
+
+<img src="pics/image-20220412171637576.png" alt="image-20220412171637576" style="zoom:67%;" />
+
+----
+
+### 4.7  线程状态转换
+
+<img src="pics/image-20220412172439836.png" alt="image-20220412172439836" style="zoom:80%;" />
+
+#### 4.7.1 NEW$\rarr$RUNNABLE 
+
+标号1：当调用 `t.start()` 方法时，由 `NEW --> RUNNABLE `
+
+#### 4.7.2 RUNNABLE$\lrarr$WAITING 
+
+标号2：t 线程用` synchronized(obj) `获取了对象锁后
+
+- 调用` obj.wait() `方法时，t 线程从 `RUNNABLE --> WAITING`
+- 调用 `obj.notify()` ，` obj.notifyAll()` ， `t.interrupt()` 时
+  - <u>竞争锁</u>成功，t 线程从 `WAITING --> RUNNABLE `
+  - <u>竞争锁</u>失败，t 线程从 `WAITING --> BLOCKED `
+
+标号3：
+
+- 当前线程调用 `t.join()` 方法时，当前线程从 `RUNNABLE --> WAITING`
+  - 注意是**当前线程**在 <u>t 线程对象的监视器</u>上等待
+- t 线程运行结束，或调用了当前线程的 `interrupt()` 时，当前线程从 `WAITING --> RUNNABLE`
+
+标号4：
+
+- 当前线程调用 `LockSupport.park()` 方法会让当前线程从 `RUNNABLE --> WAITING`
+- 调用 `LockSupport.unpark(目标线程)` 或调用了线程 的` interrupt()` ，
+  会让目标线程从 `WAITING --> RUNNABLE`
+
+#### 4.7.3 RUNNABLE$\lrarr$TIMED_WAITING 
+
+标号5：t 线程用 `synchronized(obj)` 获取了对象锁后
+
+- 调用 `obj.wait(long n)` 方法时，t 线程从 `RUNNABLE --> TIMED_WAITING`
+- t 线程等待时间超过了 n 毫秒，
+  或调用 `obj.notify()` ， `obj.notifyAll() `，` t.interrupt() `时
+  - 竞争锁成功，t 线程从 `TIMED_WAITING --> RUNNABLE `
+  - 竞争锁失败，t 线程从 `TIMED_WAITING --> BLOCKED `
+
+标号6：
+
+- 当前线程调用 `t.join(long n) `方法时，当前线程从 `RUNNABLE --> TIMED_WAITING`
+  - 注意是**当前线程**在 <u>t 线程对象的监视器</u>上等待
+- 当前线程等待时间超过了 n 毫秒，或t 线程运行结束，或调用了当前线程的 interrupt() 时，当前线程从`TIMED_WAITING --> RUNNABLE`
+
+标号7：
+
+- 当前线程调用 `Thread.sleep(long n) `，当前线程从` RUNNABLE --> TIMED_WAITING `
+- 当前线程等待时间超过了 n 毫秒，当前线程从 `TIMED_WAITING --> RUNNABLE `
+
+标号8：
+
+- 当前线程调用 `LockSupport.parkNanos(long nanos)` 或 L`ockSupport.parkUntil(long millis) `时，当前线程从 `RUNNABLE --> TIMED_WAITING`
+- 调用` LockSupport.unpark(目标线程)` 或调用了线程 的` interrupt() `，或是等待超时，会让目标线程从 `TIMED_WAITING--> RUNNABLE`
+
+#### 4.7.4 RUNNALBE$\lrarr$BLOCKED
+
+标号9：
+
+- t 线程用 `synchronized(obj)` 获取了对象锁时如果竞争失败，从` RUNNABLE --> BLOCKED `
+- 持 `obj `锁线程的<u>同步代码块执行完毕</u>，会<u>唤醒</u>该对象上所有 `BLOCKED `的线程重新竞争，如果其中 t 线程竞争成功，从 `BLOCKED --> RUNNABLE` ，其它失败的线程仍然 `BLOCKED `
+
+#### 4.7.5 RUNNABLE$\lrarr$TERMITATED
+
+标号10：当前线程所有代码运行完毕，进入 `TERMINATED`
+
+
+
+
+
 
 
 
@@ -1411,19 +2005,7 @@ c.i.MyBenchmark.b    avgt        5  16.976        1.572  ns/op
 
 ----
 
-### 4.6 线程活跃状态
-
-
-
-
-
-
-
-
-
-----
-
-### 4.7 活跃性
+### 4.8 活跃性
 
 
 

@@ -531,11 +531,13 @@
 
 ##### 2、传参：:star:一个简单参数
 
-- 认为**基本数据类型**与**String类型**是简单参数
+- 认为**基本数据类型及其包装类**与**String类型**是简单参数
 
 - 占位符书写方法：`#{任意字符}`
 
   > 只能写**一个**，任意字符，与方法形参名无关
+
+> 如果参数是数组或集合怎么办？使用`foreach`标签
 
 ##### 3、传参：:star:多个简单参数(@param)
 
@@ -771,14 +773,20 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     >
     > property 属性依然是引用属性名
     >
-    > <u>column 属性</u>指定的是**分步查询条件字段**（或者说是表连接中的关键字段）
+    > <u>column 属性</u>指定的是**分步查询条件字段**
+    >
+    > > 或者说是：
+    > >
+    > > - 表连接中的关键字段
+    > > - **外键**
+    > > - 另一个接口方法要传的参数
     >
     > <u>select 属性</u>指定分步查询第二步的 SQL **唯一标识**（命名空间 + SQL ID）
     >
     > ```xml
     > <association property="dept"
-    >              select="com.xxx.xxx.selectXxxByStepTwo"
-    >              column="did"></association>
+    >           select="com.xxx.xxx.selectXxxByStepTwo"
+    >           column="did"></association>
     > ```
     >
     > :star:分步查询的好处：延迟加载/懒连载
@@ -787,10 +795,10 @@ List<Student> selectByNameOrAge(@Param("name") String name,
     >
     > ```xml
     > <settings>
-    >     <!--开启延迟加载-->
-    >     <setting name="lazyLoadingEnabled" value="true"></setting>
-    >     <!--调用方法时不要加载对象的所有属性-->
-    >     <!--agressiveLazyLoading default false-->
+    >  <!--开启延迟加载-->
+    >  <setting name="lazyLoadingEnabled" value="true"></setting>
+    >  <!--调用方法时不要加载对象的所有属性-->
+    >  <!--agressiveLazyLoading default false-->
     > </settings>
     > ```
     >
@@ -2869,7 +2877,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
   > 框架会自动给形参赋值；
   >
-  > 对于请求中携带的其他参数，<u>要求**形式参数名**与**name属性**相同</u>
+  > 对于请求中携带的请求参数，<u>要求**形式参数名**与**name属性**相同</u>
   >
   > > :star:请求参数:star:
   > >
@@ -2983,7 +2991,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 >
 > - ***raw***
 >
->   - 可以上传任意格式的文本，可以上传text、json、xml、html等
+>   - 可以上传任意格式的**文本**，可以上传text、json、xml、html等
 >
 > - ***binary***
 >
@@ -3217,6 +3225,8 @@ List<Student> selectByNameOrAge(@Param("name") String name,
        > > 因为默认Content-Type是text/html;charset=ISO-8859-1；
        > >
        > > 需要在`@RequestMapping`注解中配置
+       
+       > 如果<u>不加这个注解而返回了一个对象</u>，就会当成**视图**被解析，大概率是404错误
 
 #### (四) url-pattern
 
@@ -3446,6 +3456,8 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 1. 在`Controller`方法中的合适位置**抛出异常**
 
 2. 创建一个**异常处理类**，用<u>`@ControllerAdvice`</u>修饰这个类
+
+   > 注意，如果是要返回JSON格式数据，可以直接用`@RestControllerAdvice`注解
 
 3. 在异常处理类中方法的定义格式与`Controller`方法的**定义格式相同**，要有一个***Exception*类型的参数**，用于接收异常
 
