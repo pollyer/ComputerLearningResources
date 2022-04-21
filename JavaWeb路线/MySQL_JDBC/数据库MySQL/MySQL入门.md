@@ -419,17 +419,21 @@ select 字段名 from 表名 where 筛选条件 order by 排序字段名 (desc /
 
     > :star:==执行顺序==：
     >
-    > `from ...`
+    > `from ...` （`join ... on ...`）
     >
     > `where ...`
     >
     > `group by ... having ...`
     >
-    > `select ...`
+    > `select ...`（`distinct`）
     >
     > `order by ...`
+    >
+    > （`limit`）
 
     > `group by`后面只跟一个`字段名`，即**相同字段值的为一组**
+    >
+    > 注意，比较特殊的一点是，`group by`就可以使用`select`中的别名了
 
   - `select`要与`group by`匹配上，即==select后只能出现**分组字段名**和**分组函数**==，不然<u>没意义</u>
 
@@ -438,9 +442,9 @@ select 字段名 from 表名 where 筛选条件 order by 排序字段名 (desc /
   - 可以多个字段**联合分组**，把多个字段联合成一个去看，没有顺序之分
 
     > <u>参与联合分组的字段</u>都可以直接出现在`select`后
-
+  
   - `having`必须和`group by`联合使用，作用是**进一步过滤掉整个分组**
-
+  
     > :star:优化策略:star:
     >
     > 使用`having`的<u>效率往往较低</u>，因为都已经分完组了却又要扔掉；
@@ -448,7 +452,7 @@ select 字段名 from 表名 where 筛选条件 order by 排序字段名 (desc /
     > 所以，能使用`where`过滤的，尽量先用`where`，效率更高
     >
     > （其实就是不同的思考方式）
-
+  
     > 当过滤条件中**必须要用到<u>分组函数</u>**时，就只能用`having`而不能用`where`了
 
 ### （2）分组函数
