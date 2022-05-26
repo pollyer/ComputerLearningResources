@@ -1111,39 +1111,41 @@ public class LoginController {
 @Configuration
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-    /**
+  /**
     * 把AuthenticationManager注入容器，记得要加@Bean注解
     */
-    @Bean
-    @Override
-    public AuthenticationManager authenticationManagerBean() throws Exception {
-        return super.authenticationManagerBean();
-    }
+  @Bean
+  @Override
+  public AuthenticationManager authenticationManagerBean() throws Exception {
+    return super.authenticationManagerBean();
+  }
 
-    /**
+  /**
     * 放行自定义登录接口
     */
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            //关闭csrf（后面具体讲）
-            .csrf().disable()
-            //不通过Session获取SecurityContext
-            //前后端分离项目不要用Session了                
-            .sessionManagement()
-            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            .and()
-            .authorizeRequests()
-            // 对于登录接口，只允许匿名访问，也就是认证之后(携带了token)就访问不了了
-            .antMatchers("/user/login").anonymous()
-            // 除上面外的所有请求全部需要鉴权认证
-            .anyRequest().authenticated();
-    }
-    
-    @Bean
-    public PasswordEncoder passwordEncoder(){
-        return new BCryptPasswordEncoder();
-    }
+  @Override
+  protected void configure(HttpSecurity http) throws Exception {
+    //下面这个方法省略了，则会少一些过滤器等配置
+    //super.configure(http)
+    http
+      //关闭csrf（后面具体讲）
+      .csrf().disable()
+      //不通过Session获取SecurityContext
+      //前后端分离项目不要用Session了                
+      .sessionManagement()
+      .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+      .and()
+      .authorizeRequests()
+      // 对于登录接口，只允许匿名访问，也就是认证之后(携带了token)就访问不了了
+      .antMatchers("/user/login").anonymous()
+      // 除上面外的所有请求全部需要鉴权认证
+      .anyRequest().authenticated();
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder(){
+    return new BCryptPasswordEncoder();
+  }
 }
 ~~~~
 

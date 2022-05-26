@@ -542,7 +542,10 @@
 ##### 3、传参：:star:多个简单参数(@param)
 
 - 利用**注解Param**，在方法的形参前使用，指定value
+
 - 指定的value就可以在SQL标签中使用：`#{value}`
+
+  > 就算是同名，也要指定
 
 ```java
 List<Student> selectByNameOrAge(@Param("name") String name, 
@@ -2004,7 +2007,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
     - 这样，这个私有方法的**方法签名**就成为了切入点表达式的**别名**
 
-      > 方法签名：`method(params)`；
+      > 方法签名：`method(params)`
       >
       > 当然只能在<u>同一个切面类</u>中使用
 
@@ -2052,6 +2055,8 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 1. 加入<u>`spring-aspects`依赖</u>
 
 2. 首先需要创建一个**<u>切面类</u>**，加上==<u>@Aspect修饰</u>==
+
+   > 别忘了`@Component`也要加
 
 3. 在**切面类**中定义方法（方法就代表**<u>切面功能</u>**），方法上加**<u>注解</u>**
 
@@ -3045,7 +3050,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 >
 >   - 想修饰对象引用？好像没这么用的，很奇怪
 >
->   - 修饰数组：将数组名当成key，去寻找form-data参数，按顺序**都**存在数组中
+>   - 修饰数组：将**数组名**当成key，去寻找form-data参数，按顺序**都**存在数组中
 >
 > $\Rarr$`不使用注解修饰`
 >
@@ -3496,7 +3501,7 @@ List<Student> selectByNameOrAge(@Param("name") String name,
 
   > 可以对请求做**预处理**；
   >
-  > 可以把多个controller**共用的功能**定义到拦截器中
+  > 可以把==多个controller**共用的功能**==定义到拦截器中
 
 - *特点*
 
@@ -3540,6 +3545,8 @@ List<Student> selectByNameOrAge(@Param("name") String name,
       > 代表**控制器**以及之后的**postHandle**、**aftercompletion**是否执行；
       >
       > 所以如果返回了false，最好再准备一个**提示页面**，并转发
+      >
+      > > 更新：在前后端分离项目中，如果`preHandle`返回`false`，建议仍然遵循Rest风格，自行设置`response`对象，返回JSON格式数据
 
   - `postHanlde`
 

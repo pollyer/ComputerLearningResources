@@ -30,7 +30,9 @@ JWT由<u>3部分</u>组成，用`.`进行拼接
 
   > 还会进行<u>base64编码</u>
 
-- Payload(载荷)：存放有效信息
+  > 内容比较固定，可以被解密出来
+
+- Payload(载荷)：存放自定义有效信息
 
   ```json
   {
@@ -44,7 +46,9 @@ JWT由<u>3部分</u>组成，用`.`进行拼接
   >
   > 也会进行<u>base64编码</u>
 
-- Signature：对*Header*和*Payload*(***base64*编码**后)用**指定的算法**进行加密后得到的结果
+  > 可以被解密，不能存放敏感信息
+
+- Signature：对*Header*、*Payload*(***base64*编码**后)和**密钥**(就是这个Signature)用**指定的算法**进行<u>加密</u>后得到的结果
 
   ```javascript
   var encodedString = 
@@ -53,6 +57,10 @@ JWT由<u>3部分</u>组成，用`.`进行拼接
   ```
 
   > **解密**时也是需要Signature的，利用设置签名时的key即可
+  
+  > 只要密钥不丢失，就可以认为整个JwtToken是安全的；
+  >
+  > JWT验证的主要部分就是Signature
 
 ## 2、使用
 

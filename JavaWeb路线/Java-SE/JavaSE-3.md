@@ -323,9 +323,14 @@
 
   - `Class`对象的`getFields()`方法
 
+    > 只包括`public`的，默认的都不行
+
+  - `Class`对象的`getDeclaredFields()`方法
+
 - ##### *方式二*
 
   - `Class`对象的`getField()`方法
+  - `Class`对象的`getDeclaredField()`方法
 
 #### （二）Field类常用方法
 
